@@ -1,0 +1,10 @@
+[
+    {
+        "url": "https://www.zhihu.com/",
+        "interval_s": 30
+    },
+    {
+        "url": "https://www.deepseek.com/",
+        "interval_s": 30
+    }
+]
