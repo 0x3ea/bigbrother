@@ -10,6 +10,7 @@ import (
 type Target struct {
 	URL       string `json:"url"`
 	IntervalS int64  `json:"interval_s"`
+	TimeoutMS int64  `json:"timeout_ms"`
 }
 
 const TargetsEnvironment = "BIGBROTHER_TARGETS"
@@ -25,6 +26,9 @@ func ParseTargets(data []byte) ([]Target, error) {
 		}
 		if t.IntervalS <= 0 {
 			return nil, fmt.Errorf("target %s must have positive interval_s", t.URL)
+		}
+		if t.TimeoutMS <= 0 {
+			return nil, fmt.Errorf("target %s must have positive TimeoutMS", t.URL)
 		}
 	}
 	return ts, nil
