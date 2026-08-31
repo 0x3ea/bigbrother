@@ -30,7 +30,7 @@ func (p *HTTPSProber) Probe(ctx context.Context, t config.Target) Result {
 	if res.TLSCertNotAfter.IsZero() {
 		// 请求成功但没拿到证书,说明目标实际是 http,类型配错了
 		res.Success = false
-		res.Error = fmt.Errorf("no TLS certificate presented by %s, check target type", t.URL)
+		res.Error = fmt.Errorf("no TLS certificate presented by %s, check target type", t.Target)
 		return res
 	}
 	if daysLeft := time.Until(res.TLSCertNotAfter).Hours() / 24; daysLeft < certExpireWarnDays {

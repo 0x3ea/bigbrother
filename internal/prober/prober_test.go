@@ -9,6 +9,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"io"
+	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -43,6 +45,7 @@ func newTLSServer(t *testing.T, notAfter time.Time) *httptest.Server {
 
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Config.ErrorLog = log.New(io.Discard, "", 0)
 	srv.TLS = &tls.Config{Certificates: []tls.Certificate{{
 		Certificate: [][]byte{der}, PrivateKey: key,
 	}}}
@@ -56,12 +59,6 @@ func newTLSServer(t *testing.T, notAfter time.Time) *httptest.Server {
 // 非法url
 // 超时控制是否生效
 // 拒绝连接(无服务)
-
-// https
-// 有效证书
-// 临期证书
-// 过期证书
-// 是http
 
 func TestProberHTTP_StatusCode(t *testing.T) {
 	cases := []struct {
@@ -84,7 +81,7 @@ func TestProberHTTP_StatusCode(t *testing.T) {
 			defer srv.Close()
 
 			res := p.Probe(context.Background(), config.Target{
-				URL: srv.URL, IntervalS: 1, TimeoutMS: 1000,
+				Target: srv.URL, IntervalS: 1, TimeoutMS: 1000,
 			})
 
 			if res.Success != c.wantOK {
@@ -99,13 +96,13 @@ func TestProberHTTP_StatusCode(t *testing.T) {
 
 }
 
-func TestHTTPProber_Timeout(t *testing.T) {
+func TestProberHTTP_Timeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) { time.Sleep(300 * time.Millisecond) }))
 	defer srv.Close()
 	p := &prober.HTTPProber{}
 	res := p.Probe(context.Background(), config.Target{
-		URL: srv.URL, IntervalS: 1, TimeoutMS: 50,
+		Target: srv.URL, IntervalS: 1, TimeoutMS: 50,
 	})
 
 	if res.Success {
@@ -120,7 +117,7 @@ func TestHTTPProber_Timeout(t *testing.T) {
 	}
 }
 
-func TestHTTPProber_ConnectionRefused(t *testing.T) {
+func TestProberHTTP_ConnectionRefused(t *testing.T) {
 	// 先占一个空闲端口再立刻释放:拿到一个"语法合法、确定没人监听"的地址
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -132,7 +129,7 @@ func TestHTTPProber_ConnectionRefused(t *testing.T) {
 	p := &prober.HTTPProber{}
 
 	res := p.Probe(context.Background(), config.Target{
-		URL: "http://" + addr, IntervalS: 1, TimeoutMS: 1000,
+		Target: "http://" + addr, IntervalS: 1, TimeoutMS: 1000,
 	})
 	if res.Success {
 		t.Fatal("expected failure")
@@ -144,7 +141,7 @@ func TestHTTPProber_ConnectionRefused(t *testing.T) {
 	}
 }
 
-func TestHTTPProber_InvalidURL(t *testing.T) {
+func TestProberHTTP_InvalidURL(t *testing.T) {
 	cases := []string{
 		"http://example.com/%zz",
 		"http://[::1",
@@ -154,7 +151,7 @@ func TestHTTPProber_InvalidURL(t *testing.T) {
 	for _, raw := range cases {
 		t.Run(raw, func(t *testing.T) {
 			res := p.Probe(context.Background(), config.Target{
-				URL: raw, IntervalS: 1, TimeoutMS: 1000,
+				Target: raw, IntervalS: 1, TimeoutMS: 1000,
 			})
 			if res.Success {
 				t.Fatal("expected failure")
@@ -171,6 +168,12 @@ func TestHTTPProber_InvalidURL(t *testing.T) {
 		})
 	}
 }
+
+// https
+// 有效证书
+// 临期证书
+// 过期证书
+// 是http
 
 func TestProberHTTPS_CertValidity(t *testing.T) {
 	now := time.Now()
@@ -191,7 +194,7 @@ func TestProberHTTPS_CertValidity(t *testing.T) {
 			defer srv.Close()
 			p := &prober.HTTPSProber{Client: srv.Client()}
 			res := p.Probe(context.Background(), config.Target{
-				URL: srv.URL, IntervalS: 1, TimeoutMS: 1000,
+				Target: srv.URL, IntervalS: 1, TimeoutMS: 1000,
 			})
 			if res.Success != c.wantOK {
 				t.Fatalf("Success = %v, want %v (err = %v)", res.Success, c.wantOK, res.Error)
@@ -218,7 +221,7 @@ func TestProberHTTPS_PlainHTTPTarget(t *testing.T) {
 	defer srv.Close()
 
 	res := (&prober.HTTPSProber{}).Probe(context.Background(), config.Target{
-		URL: srv.URL, IntervalS: 1, TimeoutMS: 1000,
+		Target: srv.URL, IntervalS: 1, TimeoutMS: 1000,
 	})
 	if res.Success {
 		t.Fatal("expected failure: target is plain http")
@@ -228,33 +231,96 @@ func TestProberHTTPS_PlainHTTPTarget(t *testing.T) {
 	}
 }
 
-func TestNewProber(t *testing.T) {
-	cases := []struct {
-		name     string
-		url      string
-		wantType string // 空 = 期望报错
-	}{
-		{"http", "http://example.com", "http"},
-		{"https", "https://example.com", "https"},
-		{"ftp_unsupported", "ftp://example.com", ""},
-		{"missing_scheme", "example.com", ""},
-		{"bad_url", "http://[::1", ""},
-		{"uppercase_scheme", "HTTP://example.com", "http"},
+// tcp
+
+// newTCPListener 起一个真实监听,Accept 到连接就关掉
+func newTCPListener(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			p, err := prober.NewProber(config.Target{URL: c.url, IntervalS: 1, TimeoutMS: 1000})
-			if c.wantType == "" {
-				if err == nil {
-					t.Fatalf("want error, got prober %T", p)
-				}
-				return
-			}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
 			if err != nil {
-				t.Fatal(err)
+				return // listener 已关闭,退出
 			}
-			if got := p.Type(); got != c.wantType {
-				t.Errorf("Type() = %q, want %q", got, c.wantType)
+			conn.Close()
+		}
+	}()
+	return ln.Addr().String()
+}
+
+// 连接正常/失败
+func TestProberTCP(t *testing.T) {
+	cases := []struct {
+		name        string
+		setup       func(t *testing.T) string
+		timeout     time.Duration
+		wantOK      bool
+		wantTimeout bool
+	}{
+		{
+			name:        "port_open",
+			setup:       newTCPListener,
+			timeout:     time.Second,
+			wantOK:      true,
+			wantTimeout: false,
+		},
+		{
+			name: "port_close",
+			setup: func(t *testing.T) string {
+				ln, err := net.Listen("tcp", "127.0.0.1:0")
+				if err != nil {
+					t.Fatal(err)
+				}
+				addr := ln.Addr().String()
+				ln.Close() // 先占后放,保证拿到没人监听的端口
+				return addr
+			},
+			timeout:     time.Second,
+			wantOK:      false,
+			wantTimeout: false,
+		},
+		{
+			name:        "address_unreachable",
+			setup:       func(t *testing.T) string { return "192.0.2.1:80" },
+			timeout:     200 * time.Millisecond,
+			wantOK:      false,
+			wantTimeout: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := prober.TCPProber{}
+			res := p.Probe(context.Background(), config.Target{
+				Target:    tc.setup(t),
+				IntervalS: 10,
+				TimeoutMS: tc.timeout.Milliseconds(),
+			})
+
+			if res.Success != tc.wantOK {
+				t.Fatalf("Success = %v, expect %v, err = %v", res.Success, tc.wantOK, res.Error)
+			}
+
+			if res.Latency <= 0 {
+				t.Errorf("latency = %v, want > 0", res.Latency)
+			}
+			if res.Latency > tc.timeout+500*time.Millisecond {
+				t.Errorf("latency %v much longer than timeout %v", res.Latency, tc.timeout)
+			}
+			if tc.wantTimeout {
+				// ctx 的 timer 和 fd 的写截止同时到点,谁先响决定错误类型:
+				// ctx 先响 → context.DeadlineExceeded;fd 先响 → *net.OpError(i/o timeout)。
+				// http.Client 会统一映射成前者,裸 DialContext 不会 —— 两种都得认。
+				var ne net.Error
+				if !errors.Is(res.Error, context.DeadlineExceeded) &&
+					!(errors.As(res.Error, &ne) && ne.Timeout()) {
+					t.Fatalf("error = %v, want timeout error", res.Error)
+				}
 			}
 		})
 	}

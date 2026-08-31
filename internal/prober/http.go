@@ -34,7 +34,7 @@ func probeHTTP(ctx context.Context, t config.Target, client *http.Client) Result
 		time.Duration(t.TimeoutMS)*time.Millisecond)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.URL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.Target, nil)
 	if err != nil {
 		return Result{
 			Success:   false,

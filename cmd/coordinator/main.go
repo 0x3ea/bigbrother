@@ -12,6 +12,6 @@ func main() {
 		log.Fatal(err)
 	}
 	for _, t := range targets {
-		log.Printf("monitor targe: %s, porber every %ds", t.URL, t.IntervalS)
+		log.Printf("monitor targe: %s, type: %s, porber every %ds", t.Target, t.Type, t.IntervalS)
 	}
 }

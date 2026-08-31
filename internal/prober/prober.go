@@ -3,7 +3,6 @@ package prober
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -27,16 +26,14 @@ type Prober interface {
 }
 
 func NewProber(t config.Target) (Prober, error) {
-	u, err := url.Parse(t.URL)
-	if err != nil {
-		return nil, fmt.Errorf("parse target url: %w", err)
-	}
-	switch strings.ToLower(u.Scheme) {
+	switch strings.ToLower(t.Type) {
 	case "http":
 		return &HTTPProber{}, nil
 	case "https":
 		return &HTTPSProber{}, nil
+	case "tcp":
+		return &TCPProber{}, nil
 	default:
-		return nil, fmt.Errorf("unsupported scheme %q: %s", u.Scheme, t.URL)
+		return nil, fmt.Errorf("unsupported prober type %q: %s", t.Type, t.Target)
 	}
 }

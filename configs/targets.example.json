@@ -1,12 +1,14 @@
 [
     {
-        "url": "https://www.zhihu.com/",
+        "type": "https",
+        "target": "https://www.zhihu.com/",
         "interval_s": 30,
         "timeout_ms": 5000
     },
     {
-        "url": "https://www.deepseek.com/",
-        "interval_s": 30,
-        "timeout_ms": 200
+        "type": "tcp",
+        "target": "baidu.com:443",
+        "interval_s": 10,
+        "timeout_ms": 2000
     }
 ]
