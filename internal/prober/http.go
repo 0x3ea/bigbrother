@@ -2,6 +2,7 @@ package prober
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -63,6 +64,10 @@ func probeHTTP(ctx context.Context, t config.Target, client *http.Client) Result
 		Latency:    elapsed,
 		StatusCode: resp.StatusCode,
 		Timestamp:  time.Now(),
+	}
+	// 契约:失败必须带原因,Success=false 而 Error=nil 会让下游无从诊断
+	if !res.Success {
+		res.Error = fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
 	if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {

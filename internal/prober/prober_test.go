@@ -91,6 +91,10 @@ func TestProberHTTP_StatusCode(t *testing.T) {
 			if res.StatusCode != c.status {
 				t.Errorf("StatusCode = %d, want %d", res.StatusCode, c.status)
 			}
+			// 失败必须带原因 —— 契约:Success=false ⟹ Error != nil
+			if !res.Success && res.Error == nil {
+				t.Error("failed result must carry Error, got nil")
+			}
 		})
 	}
 
