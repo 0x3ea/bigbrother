@@ -22,7 +22,7 @@ make test   # go test -race ./...
 | ------------ | ------------------------------------ |
 | `type`       | 探测类型:`http` / `https` / `tcp`(大小写不敏感) |
 | `target`     | 探测目标,格式由 type 决定,见下表     |
-| `interval_s` | 探测间隔(秒),必须为正               |
+| `interval_ms` | 探测间隔(毫秒),必须为正             |
 | `timeout_ms` | 单次探测超时(毫秒),必须为正         |
 
 各类型的 `target` 格式与判定规则:
@@ -40,13 +40,13 @@ make test   # go test -race ./...
     {
         "type": "https",
         "target": "https://www.zhihu.com/",
-        "interval_s": 30,
+        "interval_ms": 30000,
         "timeout_ms": 5000
     },
     {
         "type": "tcp",
         "target": "baidu.com:443",
-        "interval_s": 10,
+        "interval_ms": 10000,
         "timeout_ms": 2000
     }
 ]

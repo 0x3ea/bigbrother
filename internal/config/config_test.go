@@ -16,33 +16,42 @@ func TestParseTargets(t *testing.T) {
 		wantErrSub string // 空 = 期望成功;非空 = 期望错误信息包含该子串
 	}{
 		// --- 合法 ---
-		{"http_target", `[{"type":"http","target":"http://a.com","interval_s":30,"timeout_ms":5000}]`, ""},
-		{"https_target", `[{"type":"https","target":"https://a.com","interval_s":30,"timeout_ms":5000}]`, ""},
-		{"tcp_target", `[{"type":"tcp","target":"baidu.com:443","interval_s":10,"timeout_ms":2000}]`, ""},
-		{"type_case_insensitive", `[{"type":"HTTPS","target":"https://a.com","interval_s":30,"timeout_ms":5000}]`, ""},
-		{"multiple_targets", `[{"type":"http","target":"http://a.com","interval_s":30,"timeout_ms":5000},{"type":"tcp","target":"a.com:443","interval_s":10,"timeout_ms":2000}]`, ""},
+		{"http_target", `[{"name":"a","type":"http","target":"http://a.com","interval_ms":30,"timeout_ms":5000}]`, ""},
+		{"https_target", `[{"name":"a","type":"https","target":"https://a.com","interval_ms":30,"timeout_ms":5000}]`, ""},
+		{"tcp_target", `[{"name":"baidu","type":"tcp","target":"baidu.com:443","interval_ms":10,"timeout_ms":2000}]`, ""},
+		{"type_case_insensitive", `[{"name":"a","type":"HTTPS","target":"https://a.com","interval_ms":30,"timeout_ms":5000}]`, ""},
+		{"multiple_targets", `[{"name":"a","type":"http","target":"http://a.com","interval_ms":30,"timeout_ms":5000},{"name":"b","type":"tcp","target":"a.com:443","interval_ms":10,"timeout_ms":2000}]`, ""},
 		{"empty_array", `[]`, ""},
 
 		// --- JSON 层 ---
 		{"illegal_json", `{]`, "parse targets"},
 
 		// --- type 校验(最先执行,会掩盖后面的错误,所以单独覆盖) ---
-		{"type_missing", `[{"target":"http://a.com","interval_s":30,"timeout_ms":5000}]`, "prober type"},
-		{"type_unknown", `[{"type":"grpc","target":"a.com:443","interval_s":30,"timeout_ms":5000}]`, "prober type"},
+		{"type_missing", `[{"name":"a","target":"http://a.com","interval_ms":30,"timeout_ms":5000}]`, "prober type"},
+		{"type_unknown", `[{"name":"a","type":"grpc","target":"a.com:443","interval_ms":30,"timeout_ms":5000}]`, "prober type"},
 
 		// --- http/https target 格式 ---
-		{"http_target_no_host", `[{"type":"http","target":"http://","interval_s":30,"timeout_ms":5000}]`, "missing host"},
+		{"http_target_no_host", `[{"name":"a","type":"http","target":"http://","interval_ms":30,"timeout_ms":5000}]`, "missing host"},
 		// url.Parse 极其宽容,裸字符串也能解析成功,靠 Host=="" 才拦得住
-		{"http_target_bare_string", `[{"type":"http","target":"hello","interval_s":30,"timeout_ms":5000}]`, "missing host"},
+		{"http_target_bare_string", `[{"name":"a","type":"http","target":"hello","interval_ms":30,"timeout_ms":5000}]`, "missing host"},
 
 		// --- tcp target 格式 ---
-		{"tcp_target_no_port", `[{"type":"tcp","target":"example.com","interval_s":30,"timeout_ms":5000}]`, "tcp target"},
-		{"tcp_target_port_out_of_range", `[{"type":"tcp","target":"example.com:70000","interval_s":30,"timeout_ms":5000}]`, "tcp target"},
-		{"tcp_target_no_host", `[{"type":"tcp","target":":443","interval_s":30,"timeout_ms":5000}]`, "tcp target"},
+		{"tcp_target_no_port", `[{"name":"example","type":"tcp","target":"example.com","interval_ms":30,"timeout_ms":5000}]`, "tcp target"},
+		{"tcp_target_port_out_of_range", `[{"name":"example","type":"tcp","target":"example.com:70000","interval_ms":30,"timeout_ms":5000}]`, "tcp target"},
+		{"tcp_target_no_host", `[{"name":"a","type":"tcp","target":":443","interval_ms":30,"timeout_ms":5000}]`, "tcp target"},
 
 		// --- 数值校验(必须带合法 type,否则会被 type 检查提前拦下) ---
-		{"interval_zero", `[{"type":"http","target":"http://a.com","interval_s":0,"timeout_ms":5000}]`, "interval_s"},
-		{"timeout_zero", `[{"type":"http","target":"http://a.com","interval_s":30,"timeout_ms":0}]`, "TimeoutMS"},
+		{"interval_zero", `[{"name":"a","type":"http","target":"http://a.com","interval_ms":0,"timeout_ms":5000}]`, "interval_ms"},
+		{"timeout_zero", `[{"name":"a","type":"http","target":"http://a.com","interval_ms":30,"timeout_ms":0}]`, "timeout_ms"},
+
+		// --- 不能有重名 ---
+		{"duplicate_name", `[{"name":"a","type":"tcp","target":"baidu.com:443","interval_ms":1,"timeout_ms":1},
+		{"name":"a","type":"tcp","target":"qq.com:443","interval_ms":1,"timeout_ms":1}
+		]`, "duplicated"},
+
+		// --- 缺失name ---
+		{"name_missing", `[{"name":"","type":"tcp","target":"baidu.com:443","interval_ms":1,"timeout_ms":1}
+		]`, "missing name"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -71,14 +80,14 @@ func TestLoadTargets(t *testing.T) {
 			name: "env points to a valid file",
 			setup: func(t *testing.T) {
 				f := filepath.Join(t.TempDir(), "targets.json")
-				data := `[{"type":"https","target":"https://a.com","interval_s":30,"timeout_ms":5000}]`
+				data := `[{"name":"a","type":"https","target":"https://a.com","interval_ms":3000,"timeout_ms":5000}]`
 				if err := os.WriteFile(f, []byte(data), 0o644); err != nil {
 					t.Fatal(err)
 				}
 				t.Setenv(config.TargetsEnvironment, f)
 			},
 			wantLen: 1,
-			want:    &config.Target{Type: "https", Target: "https://a.com", IntervalS: 30, TimeoutMS: 5000},
+			want:    &config.Target{Name: "a", Type: "https", Target: "https://a.com", IntervalMS: 3000, TimeoutMS: 5000},
 		},
 		{
 			name: "env not set",
@@ -110,7 +119,7 @@ func TestLoadTargets(t *testing.T) {
 			setup: func(t *testing.T) {
 				f := filepath.Join(t.TempDir(), "targets.json")
 				// JSON 合法,但 http target 缺 host —— 校验层必须拦住
-				data := `[{"type":"http","target":"http://","interval_s":30,"timeout_ms":5000}]`
+				data := `[{"name":"a","type":"http","target":"http://","interval_ms":3000,"timeout_ms":5000}]`
 				if err := os.WriteFile(f, []byte(data), 0o644); err != nil {
 					t.Fatal(err)
 				}

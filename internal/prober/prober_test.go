@@ -81,7 +81,7 @@ func TestProberHTTP_StatusCode(t *testing.T) {
 			defer srv.Close()
 
 			res := p.Probe(context.Background(), config.Target{
-				Target: srv.URL, IntervalS: 1, TimeoutMS: 1000,
+				Target: srv.URL, IntervalMS: 1000, TimeoutMS: 1000,
 			})
 
 			if res.Success != c.wantOK {
@@ -106,7 +106,7 @@ func TestProberHTTP_Timeout(t *testing.T) {
 	defer srv.Close()
 	p := &prober.HTTPProber{}
 	res := p.Probe(context.Background(), config.Target{
-		Target: srv.URL, IntervalS: 1, TimeoutMS: 50,
+		Target: srv.URL, IntervalMS: 1000, TimeoutMS: 50,
 	})
 
 	if res.Success {
@@ -133,7 +133,7 @@ func TestProberHTTP_ConnectionRefused(t *testing.T) {
 	p := &prober.HTTPProber{}
 
 	res := p.Probe(context.Background(), config.Target{
-		Target: "http://" + addr, IntervalS: 1, TimeoutMS: 1000,
+		Target: "http://" + addr, IntervalMS: 1000, TimeoutMS: 1000,
 	})
 	if res.Success {
 		t.Fatal("expected failure")
@@ -155,7 +155,7 @@ func TestProberHTTP_InvalidURL(t *testing.T) {
 	for _, raw := range cases {
 		t.Run(raw, func(t *testing.T) {
 			res := p.Probe(context.Background(), config.Target{
-				Target: raw, IntervalS: 1, TimeoutMS: 1000,
+				Target: raw, IntervalMS: 1000, TimeoutMS: 1000,
 			})
 			if res.Success {
 				t.Fatal("expected failure")
@@ -198,7 +198,7 @@ func TestProberHTTPS_CertValidity(t *testing.T) {
 			defer srv.Close()
 			p := &prober.HTTPSProber{Client: srv.Client()}
 			res := p.Probe(context.Background(), config.Target{
-				Target: srv.URL, IntervalS: 1, TimeoutMS: 1000,
+				Target: srv.URL, IntervalMS: 1, TimeoutMS: 1000,
 			})
 			if res.Success != c.wantOK {
 				t.Fatalf("Success = %v, want %v (err = %v)", res.Success, c.wantOK, res.Error)
@@ -225,7 +225,7 @@ func TestProberHTTPS_PlainHTTPTarget(t *testing.T) {
 	defer srv.Close()
 
 	res := (&prober.HTTPSProber{}).Probe(context.Background(), config.Target{
-		Target: srv.URL, IntervalS: 1, TimeoutMS: 1000,
+		Target: srv.URL, IntervalMS: 1000, TimeoutMS: 1000,
 	})
 	if res.Success {
 		t.Fatal("expected failure: target is plain http")
@@ -301,9 +301,9 @@ func TestProberTCP(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := prober.TCPProber{}
 			res := p.Probe(context.Background(), config.Target{
-				Target:    tc.setup(t),
-				IntervalS: 10,
-				TimeoutMS: tc.timeout.Milliseconds(),
+				Target:     tc.setup(t),
+				IntervalMS: 10000,
+				TimeoutMS:  tc.timeout.Milliseconds(),
 			})
 
 			if res.Success != tc.wantOK {

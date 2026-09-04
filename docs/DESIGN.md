@@ -97,7 +97,7 @@ CREATE TABLE monitor_target (
     name        VARCHAR(128) NOT NULL,
     kind        VARCHAR(16)  NOT NULL,        -- http | tcp | ping | dns
     endpoint    VARCHAR(512) NOT NULL,        -- url / host:port
-    interval_s  INT NOT NULL DEFAULT 60,      -- 探测间隔
+    interval_ms INT NOT NULL DEFAULT 60000,   -- 探测间隔
     timeout_ms  INT NOT NULL DEFAULT 5000,
     expect_code INT,                          -- http 期望状态码
     enabled     TINYINT NOT NULL DEFAULT 1,
@@ -196,7 +196,7 @@ CREATE TABLE ssh_target_config (
 
 ### 7.2 探测调度与执行
 
-1. Coordinator 按 `target.interval_s` 生成探测任务，按"目标需要哪些 region 的探针"分发
+1. Coordinator 按 `target.interval_ms` 生成探测任务，按"目标需要哪些 region 的探针"分发
 2. Probe 领任务（grpc 流 `StreamTasks` 或定时 `FetchTasks`）
 3. Probe 执行探测：HTTP（状态码/延迟/关键字）、TCP（连通+延迟）、ping、TLS 握手取证书、**SSH（执行命令取状态/指标，见 §7.5）**
 4. Probe grpc `Report(result)` 上报 → Coordinator 写 `probe_result`

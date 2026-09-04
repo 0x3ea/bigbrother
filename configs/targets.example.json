@@ -1,14 +1,16 @@
 [
     {
+        "name": "zhihu",
         "type": "https",
         "target": "https://www.zhihu.com/",
-        "interval_s": 30,
+        "interval_ms": 30000,
         "timeout_ms": 5000
     },
     {
+        "name": "baidu",
         "type": "tcp",
         "target": "baidu.com:443",
-        "interval_s": 10,
+        "interval_ms": 10000,
         "timeout_ms": 2000
     }
 ]

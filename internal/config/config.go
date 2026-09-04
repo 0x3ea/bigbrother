@@ -12,10 +12,11 @@ import (
 )
 
 type Target struct {
-	Type      string `json:"type"`
-	Target    string `json:"target"`
-	IntervalS int64  `json:"interval_s"`
-	TimeoutMS int64  `json:"timeout_ms"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Target     string `json:"target"`
+	IntervalMS int64  `json:"interval_ms"`
+	TimeoutMS  int64  `json:"timeout_ms"`
 }
 
 const TargetsEnvironment = "BIGBROTHER_TARGETS"
@@ -57,13 +58,16 @@ func (t *Target) Validate() error {
 			return err
 		}
 	default:
-		return fmt.Errorf("target %q unknown prober type: %q (only support http/https/tcp)", t.Target, t.Type)
+		return fmt.Errorf("target %q unknown prober type: %q (supported: http/https/tcp)", t.Target, t.Type)
 	}
-	if t.IntervalS <= 0 {
-		return fmt.Errorf("target %q must have positive interval_s", t.Target)
+	if t.Name == "" {
+		return fmt.Errorf("target %q missing name", t.Target)
+	}
+	if t.IntervalMS <= 0 {
+		return fmt.Errorf("target %q must have positive interval_ms", t.Target)
 	}
 	if t.TimeoutMS <= 0 {
-		return fmt.Errorf("target %q must have positive TimeoutMS", t.Target)
+		return fmt.Errorf("target %q must have positive timeout_ms", t.Target)
 	}
 	return nil
 }
@@ -72,10 +76,15 @@ func ParseTargets(data []byte) ([]Target, error) {
 	if err := json.Unmarshal(data, &ts); err != nil {
 		return nil, fmt.Errorf("parse targets failed: %w", err)
 	}
+	seen := make(map[string]struct{}, len(ts))
 	for _, t := range ts {
 		if err := t.Validate(); err != nil {
 			return nil, err
 		}
+		if _, dup := seen[t.Name]; dup {
+			return nil, fmt.Errorf("target name %q duplicated", t.Name)
+		}
+		seen[t.Name] = struct{}{}
 	}
 	return ts, nil
 }
@@ -89,7 +98,6 @@ func LoadTargets() ([]Target, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", path, err)
-
 	}
 	return ParseTargets(data)
 }
