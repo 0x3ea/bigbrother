@@ -45,7 +45,10 @@ func saveSequence(t *testing.T, s store.Store, target config.Target, n int) prob
 // Latest: target不存在
 func TestLatest_TargetNotExist(t *testing.T) {
 	s := store.NewMemory()
-	_, ok := s.Latest("baidu.com")
+	_, ok, err := s.Latest("baidu.com")
+	if err != nil {
+		t.Fatalf("Latest() failed, err = %v", err)
+	}
 	if ok {
 		t.Fatalf("Latest() ok = true, want false")
 	}
@@ -56,7 +59,10 @@ func TestLatest_ReturnLatest(t *testing.T) {
 	s := store.NewMemory()
 	target := newTarget()
 	last := saveSequence(t, s, target, store.MaxPerTarget)
-	result, ok := s.Latest(target.Name)
+	result, ok, err := s.Latest(target.Name)
+	if err != nil {
+		t.Fatalf("Latest() failed, err = %v", err)
+	}
 	if !ok {
 		t.Fatalf("Latest() ok = false, want true")
 	}
@@ -68,7 +74,10 @@ func TestLatest_ReturnLatest(t *testing.T) {
 // History: target不存在
 func TestHistory_TargetNotExist(t *testing.T) {
 	s := store.NewMemory()
-	hist := s.History("https://www.zhihu.com/", 10)
+	hist, err := s.History("https://www.zhihu.com/", 10)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if len(hist) != 0 {
 		t.Fatalf("History() len = %d, want 0", len(hist))
 	}
@@ -80,7 +89,10 @@ func TestHistory_CountNotEnough(t *testing.T) {
 	target := newTarget()
 	num := store.MaxPerTarget / 2
 	saveSequence(t, s, target, num)
-	hist := s.History(target.Name, num+5)
+	hist, err := s.History(target.Name, num+5)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if hist == nil {
 		t.Fatalf("History(n=%d) = nil, want non-nil", num+5)
 	}
@@ -94,7 +106,10 @@ func TestHistory_ReturnInAscending(t *testing.T) {
 	s := store.NewMemory()
 	target := newTarget()
 	saveSequence(t, s, target, store.MaxPerTarget)
-	hist := s.History(target.Name, store.MaxPerTarget)
+	hist, err := s.History(target.Name, store.MaxPerTarget)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if hist == nil {
 		t.Fatalf("History(n=%d) = nil, want non-nil", store.MaxPerTarget)
 	}
@@ -112,7 +127,10 @@ func TestHistory_ReturnIsCopy(t *testing.T) {
 	target := newTarget()
 	result := newResult()
 	saveSequence(t, s, target, store.MaxPerTarget)
-	hist := s.History(target.Name, store.MaxPerTarget)
+	hist, err := s.History(target.Name, store.MaxPerTarget)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if hist == nil {
 		t.Fatalf("History(n=%d) = nil, want non-nil", store.MaxPerTarget)
 	}
@@ -120,7 +138,10 @@ func TestHistory_ReturnIsCopy(t *testing.T) {
 	result.Timestamp = time.Time{}
 	hist[store.MaxPerTarget-1] = result
 
-	hist = s.History(target.Name, store.MaxPerTarget)
+	hist, err = s.History(target.Name, store.MaxPerTarget)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if hist == nil {
 		t.Fatalf("History(n=%d) = nil, want non-nil", store.MaxPerTarget)
 	}
@@ -136,12 +157,18 @@ func TestHistory_IllegalParam(t *testing.T) {
 	s := store.NewMemory()
 	target := newTarget()
 	saveSequence(t, s, target, store.MaxPerTarget)
-	hist := s.History(target.Target, 0)
+	hist, err := s.History(target.Target, 0)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if hist != nil {
 		t.Fatalf("History(n=0) len = %d, want nil", len(hist))
 	}
 
-	hist = s.History(target.Name, -1)
+	hist, err = s.History(target.Name, -1)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if hist != nil {
 		t.Fatalf("History(n=-1) len = %d, want nil", len(hist))
 	}
@@ -159,7 +186,10 @@ func TestSave_EraseOldest(t *testing.T) {
 		result.TLSCertNotAfter = result.TLSCertNotAfter.Add(-time.Minute)
 		s.Save(target.Name, result)
 	}
-	hist := s.History(target.Name, store.MaxPerTarget)
+	hist, err := s.History(target.Name, store.MaxPerTarget)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if hist == nil {
 		t.Fatalf("History(n=%d) = nil, want non-nil", store.MaxPerTarget)
 	}
@@ -196,7 +226,10 @@ func TestSave_ConcurrentReadWrite(t *testing.T) {
 	wg.Wait()
 
 	// 不变量:任意交错之后,窗口依然守得住
-	hist := s.History(target.Name, store.MaxPerTarget+1)
+	hist, err := s.History(target.Name, store.MaxPerTarget+1)
+	if err != nil {
+		t.Fatalf("History() failed, err = %v", err)
+	}
 	if len(hist) != store.MaxPerTarget {
 		t.Fatalf("History() len = %d, want %d", len(hist), store.MaxPerTarget)
 	}

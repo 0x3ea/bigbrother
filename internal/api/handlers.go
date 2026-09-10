@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -49,7 +50,13 @@ func pendingResp(cfg config.Target) targetResp { // 有这个目标,但还没数
 func (s *Server) status(c *gin.Context) {
 	items := make([]targetResp, 0)
 	for _, t := range s.targets {
-		if r, ok := s.store.Latest(t.Name); ok {
+		r, ok, err := s.store.Latest(t.Name)
+		if err != nil {
+			log.Printf("[api] latest %s: %v", t.Name, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "store unavailable"})
+			return
+		}
+		if ok {
 			items = append(items, newTargetResp(t, r))
 		} else {
 			items = append(items, pendingResp(t))

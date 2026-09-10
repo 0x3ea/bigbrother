@@ -1,18 +1,23 @@
 BIN_DIR := bin
 
+# 密钥不进 git:.env 被 .gitignore 忽略;首次使用 cp .env.example .env 并填入密码
+-include .env
+export BIGBROTHER_DSN BIGBROTHER_TEST_DSN BIGBROTHER_TARGETS
+BIGBROTHER_TARGETS ?= configs/targets.json
+
 .PHONY: help run build test fmt vet tidy clean
 
 help: ## 显示所有可用目标
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[1m%-8s\033[0m %s\n", $$1, $$2}'
 
-run: ## 开发模式运行 coordinator(首次自动从 example 复制目标清单)
-	@test -f configs/targets.json || cp configs/targets.example.json configs/targets.json
-	BIGBROTHER_TARGETS=configs/targets.json go run ./cmd/coordinator
+run: ## 开发模式运行 coordinator(.env 里配了 BIGBROTHER_DSN 则走 MySQL,否则内存)
+	@test -f $(BIGBROTHER_TARGETS) || cp configs/targets.example.json $(BIGBROTHER_TARGETS)
+	go run ./cmd/coordinator
 
 build: ## 编译到 bin/
 	go build -o $(BIN_DIR)/coordinator ./cmd/coordinator
 
-test: ## 跑全部测试,-race 开启竞态检测(本项目重并发,值得常开)
+test: ## 跑全部测试,-race 开启竞态检测;集成测试读 .env 的 BIGBROTHER_TEST_DSN,未配置则自动 SKIP
 	go test -race ./...
 
 fmt: ## 格式化全部代码

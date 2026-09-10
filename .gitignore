@@ -1,3 +1,5 @@
 configs/targets.json
 plan.md
 bin/
+.env
+NOTE.md
